@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Naver Blog Auto-Poster | AI 블로그 자동화</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="glass-container">
+        <header>
+            <h1 id="main-title">Naver Blog <span class="gradient-text">Auto-Poster</span></h1>
+            <p class="subtitle">사진과 한 줄의 문장으로 완성하는 나만의 블로그</p>
+        </header>
+
+        <main>
+            <section class="upload-section" id="drop-zone">
+                <div class="upload-box">
+                    <div class="icon-wrapper">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="upload-icon"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                    </div>
+                    <p>사진들을 드래그하거나 클릭하여 업로드하세요</p>
+                    <input type="file" id="file-input" multiple accept="image/*" hidden>
+                </div>
+                <div id="image-preview" class="hidden"></div>
+            </section>
+
+            <section class="input-section">
+                <textarea id="prompt-input" placeholder="블로그에 담고 싶은 내용을 짧게 적어주세요 (예: 제주도 애월 맛집 다녀온 후기)"></textarea>
+                <button id="generate-btn" class="primary-btn">AI 블로그 작성하기</button>
+            </section>
+
+            <section id="result-section" class="hidden">
+                <div class="result-card">
+                    <input type="text" id="post-title" class="editable-title" placeholder="제목이 생성됩니다...">
+                    <div id="post-content" class="editable-content" contenteditable="true">
+                        내용이 여기에 생성됩니다...
+                    </div>
+                    <div class="actions">
+                        <button id="post-btn" class="secondary-btn">네이버 블로그에 포스팅</button>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <footer>
+            <p>&copy; 2026 Naver Blog Auto-Poster. Powered by Antigravity AI.</p>
+        </footer>
+    </div>
+
+    <div id="loader" class="hidden">
+        <div class="spinner"></div>
+        <p>AI가 멋진 글을 작성 중입니다...</p>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
