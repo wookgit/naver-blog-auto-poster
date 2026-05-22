@@ -107,6 +107,47 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // Post to Naver
+    const feedbackInput = document.getElementById('feedback-input');
+    const refineBtn = document.getElementById('refine-btn');
+
+    refineBtn.addEventListener('click', async () => {
+        const feedback = feedbackInput.value.trim();
+        if (!feedback) {
+            alert('수정 요청사항을 입력해주세요.');
+            return;
+        }
+
+        const title = postTitle.value;
+        const content = postContent.innerText;
+
+        loader.classList.remove('hidden');
+        document.querySelector('#loader p').innerText = 'AI가 글을 수정하고 있습니다...';
+
+        try {
+            const response = await fetch('/api/refine', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title, content, feedback })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                postTitle.value = data.title;
+                postContent.innerHTML = data.content.replace(/\n/g, '<br>');
+                feedbackInput.value = ''; // clear input
+            } else {
+                alert('수정 중 오류가 발생했습니다: ' + data.error);
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            alert('서버 연결에 실패했습니다.');
+        } finally {
+            loader.classList.add('hidden');
+            document.querySelector('#loader p').innerText = 'AI가 멋진 글을 작성 중입니다...';
+        }
+    });
+
     postBtn.addEventListener('click', async () => {
         const title = postTitle.value;
         const content = postContent.innerText;

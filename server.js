@@ -35,6 +35,24 @@ const upload = multer({ storage: storage });
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY, { apiVersion: 'v1' });
 
+// 503 에러 자동 재시도 함수
+const delay = (ms) => new Promise(res => setTimeout(res, ms));
+async function generateWithRetry(model, parts, maxRetries = 3) {
+    for (let i = 0; i < maxRetries; i++) {
+        try {
+            return await model.generateContent(parts);
+        } catch (error) {
+            if (error.message.includes('503') || error.status === 503 || error.message.includes('high demand')) {
+                console.warn(`\n[API 경고] 구글 API 서버 트래픽이 많습니다 (503). ${i + 1}/${maxRetries}회 재시도 중... (3초 대기)`);
+                if (i === maxRetries - 1) throw error;
+                await delay(3000);
+            } else {
+                throw error;
+            }
+        }
+    }
+}
+
 // 블로그 생성 API
 app.post('/api/generate', upload.array('images'), async (req, res) => {
     try {
@@ -62,20 +80,38 @@ app.post('/api/generate', upload.array('images'), async (req, res) => {
         const parts = [promptText];
         
         if (images && images.length > 0) {
-            images.forEach((img, index) => {
-                parts.push({
-                    inlineData: {
-                        data: fs.readFileSync(img.path).toString('base64'),
-                        mimeType: img.mimetype
-                    }
-                });
+            let gifCount = 0;
+            images.forEach((img) => {
+                if (img.mimetype === 'image/gif') {
+                    gifCount++;
+                } else {
+                    parts.push({
+                        inlineData: {
+                            data: fs.readFileSync(img.path).toString('base64'),
+                            mimeType: img.mimetype
+                        }
+                    });
+                }
             });
-            promptText += `\n제공된 ${images.length}장의 이미지를 분석해서 각 사진에 어울리는 위치에 [IMAGE_1] 표시를, 관련 장소가 있다면 [PLACE: 장소명] 표시를 넣어 글을 작성해줘.`;
+            
+            promptText += `\n총 ${images.length}개의 파일(사진 및 움짤)이 제공되었습니다. (움짤 ${gifCount}개 포함)`;
+            promptText += `\n제공된 파일이 적절히 배치되도록 본문에 [IMAGE_1]부터 [IMAGE_${images.length}]까지 순서대로 표시를 남겨주세요. (움짤은 분석하지 않고 건너뛰었으니, 글 흐름상 자연스러운 곳에 배치해주세요.)`;
+            promptText += `\n관련 장소가 있다면 [PLACE: 장소명] 표시도 함께 넣어 글을 작성해줘.`;
+            
+            // parts 배열의 첫 번째 요소인 텍스트 부분을 업데이트된 promptText로 교체
+            parts[0] = promptText;
         }
 
-        const result = await model.generateContent(parts);
+        const result = await generateWithRetry(model, parts);
         const response = await result.response;
         const text = response.text();
+
+        if (response.usageMetadata) {
+            console.log(`\n📊 [토큰 사용량 - 초기 생성]`);
+            console.log(`- 입력 토큰: ${response.usageMetadata.promptTokenCount}`);
+            console.log(`- 출력 토큰: ${response.usageMetadata.candidatesTokenCount}`);
+            console.log(`- 총 사용량: ${response.usageMetadata.totalTokenCount}\n`);
+        }
 
         const lines = text.split('\n');
         const title = lines[0].replace('제목:', '').replace('##', '').trim();
@@ -86,6 +122,53 @@ app.post('/api/generate', upload.array('images'), async (req, res) => {
         res.json({ success: true, title, content, images: imageUrls });
     } catch (error) {
         console.error('Gemini Error:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// 피드백 기반 글 수정 API
+app.post('/api/refine', async (req, res) => {
+    try {
+        const { title, content, feedback } = req.body;
+        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+
+        const promptText = `
+        당신은 네이버 블로그 포스팅 전문가입니다.
+        현재 작성된 블로그 초안은 다음과 같습니다:
+        
+        제목: ${title}
+        본문:
+        ${content}
+        
+        사용자의 수정 요청: "${feedback}"
+        
+        위 요청을 반영하여 초안을 자연스럽게 수정해주세요.
+        
+        **수정 필수 규칙:**
+        1. [IMAGE_n]이나 [PLACE: 장소명] 같은 기존의 위치 표시 태그는 **절대 지우지 말고**, 문맥에 맞게 본문에 그대로 남겨두세요. (매우 중요)
+        2. #, **, >와 같은 마크다운 기호는 절대 사용하지 마세요.
+        3. 소제목은 [소제목] 또는 📍, ✅와 같은 이모지를 사용하세요.
+        4. 결과는 첫 줄에 '제목: (수정된 제목)'을 쓰고, 다음 줄부터 본문을 작성해주세요.
+        `;
+
+        const result = await generateWithRetry(model, promptText);
+        const response = await result.response;
+        const text = response.text();
+
+        if (response.usageMetadata) {
+            console.log(`\n📊 [토큰 사용량 - 피드백 수정]`);
+            console.log(`- 입력 토큰: ${response.usageMetadata.promptTokenCount}`);
+            console.log(`- 출력 토큰: ${response.usageMetadata.candidatesTokenCount}`);
+            console.log(`- 총 사용량: ${response.usageMetadata.totalTokenCount}\n`);
+        }
+
+        const lines = text.split('\n');
+        const newTitle = lines[0].replace('제목:', '').replace('##', '').trim();
+        const newContent = lines.slice(1).join('\n').trim();
+
+        res.json({ success: true, title: newTitle, content: newContent });
+    } catch (error) {
+        console.error('Refine Error:', error);
         res.status(500).json({ success: false, error: error.message });
     }
 });

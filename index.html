@@ -22,7 +22,7 @@
                     <div class="icon-wrapper">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="upload-icon"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
                     </div>
-                    <p>사진들을 드래그하거나 클릭하여 업로드하세요</p>
+                    <p>사진 및 GIF(움짤)를 드래그하거나 클릭하여 업로드하세요</p>
                     <input type="file" id="file-input" multiple accept="image/*" hidden>
                 </div>
                 <div id="image-preview" class="hidden"></div>
@@ -39,6 +39,12 @@
                     <div id="post-content" class="editable-content" contenteditable="true">
                         내용이 여기에 생성됩니다...
                     </div>
+                    
+                    <div class="chat-feedback-section">
+                        <input type="text" id="feedback-input" placeholder="AI에게 수정 요청하기... (예: 좀 더 발랄하게 고쳐줘)">
+                        <button id="refine-btn" class="chat-btn">수정 반영</button>
+                    </div>
+
                     <div class="actions">
                         <button id="post-btn" class="secondary-btn">네이버 블로그에 포스팅</button>
                     </div>
